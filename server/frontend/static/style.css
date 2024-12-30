@@ -124,3 +124,46 @@ img{
     text-align:center;
     box-shadow: 2px 2px 3px #999;  
 }
+
+.banner1 {
+    padding: 25px;
+    min-height: 75px;
+    width: 80%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin: 55px auto 28px auto;
+    border-radius: 35px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 1);
+}
+
+.banner-image{
+    width: 50%; 
+    border-bottom: solid 2px #7b7b7b;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.content {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    position: relative;
+}
+
+.content .right {
+    padding-left: 20px;
+    justify-content: center;
+    text-align:center;
+    color: hsl(197, 100%, 50%);
+}
+
+.title-right{
+    font-weight: bold;
+}
+
+.content .left {
+    flex: 2;
+    padding-right: 15px;
+    border-right: 2px solid #7b7b7b;
+}
