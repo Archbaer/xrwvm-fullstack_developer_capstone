@@ -4,15 +4,12 @@ from django.contrib.auth import logout, login, authenticate
 from django.http import JsonResponse
 import logging
 import json
-from django.db import connection
-from django.views.decorators.csrf import csrf_exempt
 from .populate import initiate
 from .models import CarMake, CarModel
 from .restapis import get_request, analyze_review_sentiments, post_review
 
 # Get an instance of a logger
 logger = logging.getLogger(__name__)
-
 
 @csrf_exempt
 def login_user(request):
@@ -26,11 +23,9 @@ def login_user(request):
         response["status"] = "Authenticated"
     return JsonResponse(response)
 
-
 def logout_request(request):
     logout(request)
     return JsonResponse({"userName": ""})
-
 
 @csrf_exempt
 def registration(request):
@@ -55,7 +50,6 @@ def registration(request):
         login(request, user)
         return JsonResponse({"userName": username, "status": "Authenticated"})
 
-
 def get_cars(request):
     if CarMake.objects.count() == 0:
         initiate()
@@ -63,12 +57,10 @@ def get_cars(request):
     cars = [{"CarModel": cm.name, "CarMake": cm.car_make.name} for cm in car_models]
     return JsonResponse({"CarModels": cars})
 
-
 def get_dealerships(request, state="ALL"):
     endpoint = f"/fetchDealers/{state}" if state != "ALL" else "/fetchDealers"
     dealerships = get_request(endpoint)
     return JsonResponse({"status": 200, "dealers": dealerships})
-
 
 def get_dealer_reviews(request, dealer_id):
     if dealer_id:
@@ -79,7 +71,6 @@ def get_dealer_reviews(request, dealer_id):
         return JsonResponse({"status": 200, "reviews": reviews})
     return JsonResponse({"status": 400, "message": "Bad Request"})
 
-
 def get_dealer_details(request, dealer_id):
     if dealer_id:
         endpoint = f"/fetchDealer/{dealer_id}"
@@ -87,14 +78,13 @@ def get_dealer_details(request, dealer_id):
         return JsonResponse({"status": 200, "dealer": dealership})
     return JsonResponse({"status": 400, "message": "Bad Request"})
 
-
 def add_review(request):
     if not request.user.is_anonymous:
         try:
             data = json.loads(request.body)
             post_review(data)
             return JsonResponse({"status": 200})
-        except Exception as e:
+        except Exception:
             logger.error("Error in posting review", exc_info=True)
             return JsonResponse({"status": 401, "message": "Error in posting review"})
     return JsonResponse({"status": 403, "message": "Unauthorized"})
