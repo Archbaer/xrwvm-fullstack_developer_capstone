@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 from django.db import IntegrityError
-from ...models import CarMake, CarModel
+from dan.models import CarMake, CarModel
 
 
 class Command(BaseCommand):

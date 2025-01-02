@@ -1,82 +1,130 @@
+from django.shortcuts import render
+from django.http import HttpResponseRedirect, HttpResponse
+from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404, render, redirect
+from django.contrib.auth import logout
+from django.contrib import messages
+from datetime import datetime
 from django.http import JsonResponse
+from django.contrib.auth import login, authenticate
+import logging
+import json
+from django.db import connection
 from django.views.decorators.csrf import csrf_exempt
+from .populate import initiate
 from .models import CarMake, CarModel
-from django.core.exceptions import ObjectDoesNotExist
+from .restapis import get_request, analyze_review_sentiments, post_review
+
+
+logger = logging.getLogger(__name__)
 
 
 @csrf_exempt
-def get_car_makes(request):
-    car_makes = CarMake.objects.all()
-    car_make_data = []
-    for car_make in car_makes:
-        car_make_data.append({
-            'name': car_make.name,
-            'description': car_make.description
-        })
-    return JsonResponse({'car_makes': car_make_data})
+def login_user(request):
+
+    data = json.loads(request.body)
+    username = data['userName']
+    password = data['password']
+
+    user = authenticate(username=username, password=password)
+    data = {"userName": username}
+    if user is not None:
+
+        login(request, user)
+        data = {"userName": username, "status": "Authenticated"}
+    return JsonResponse(data)
+
+
+def logout_request(request):
+    logout(request)
+    data = {"userName":""}
+    return JsonResponse(data)
 
 
 @csrf_exempt
-def get_car_models(request, car_make_id):
+def registration(request):
+    context = {}
+
+    data = json.loads(request.body)
+    username = data['userName']
+    password = data['password']
+    first_name = data['firstName']
+    last_name = data['lastName']
+    email = data['email']
+    username_exist = False
+    email_exist = False
     try:
-        car_make = CarMake.objects.get(id=car_make_id)
-    except ObjectDoesNotExist:
-        return JsonResponse({'error': 'Car make not found'}, status=404)
 
-    car_models = CarModel.objects.filter(car_make=car_make)
-    car_model_data = []
+        User.objects.get(username=username)
+        username_exist = True
+    except:
+
+        logger.debug("{} is new user".format(username))
+
+
+    if not username_exist:
+
+        user = User.objects.create_user(username=username, first_name=first_name, last_name=last_name,password=password, email=email)
+
+        login(request, user)
+        data = {"userName":username,"status":"Authenticated"}
+        return JsonResponse(data)
+    else :
+        data = {"userName":username,"error":"Already Registered"}
+        return JsonResponse(data)
+
+def get_cars(request):
+    count = CarMake.objects.filter().count()
+    print(count)
+    print(connection.queries)
+
+    if(count == 0):
+        initiate()
+    car_models = CarModel.objects.select_related('car_make')
+    cars = []
     for car_model in car_models:
-        car_model_data.append({
-            'name': car_model.name,
-            'type': car_model.type,
-            'year': car_model.year
-        })
-    return JsonResponse({'car_models': car_model_data})
+        cars.append({"CarModel": car_model.name, "CarMake": car_model.car_make.name})
+    return JsonResponse({"CarModels": cars})
+        
+
+def get_dealerships(request, state="ALL"):
+    if(state == "ALL"):
+        endpoint = "/fetchDealers"
+    else:
+        endpoint = "/fetchDealers/"+state
+    dealerships = get_request(endpoint)
+    return JsonResponse({ "status": 200, "dealers": dealerships })
 
 
-@csrf_exempt
-def add_car_make(request):
-    if request.method == 'POST':
-        name = request.POST.get('name')
-        description = request.POST.get('description')
-        car_make = CarMake.objects.create(name=name, description=description)
-        return JsonResponse({'message': f'{car_make.name} added successfully'})
+def get_dealer_reviews(request, dealer_id):
+    if(dealer_id):
+        endpoint = "/fetchReviews/dealer/"+str(dealer_id)
+        reviews = get_request(endpoint)
+        for review_detail in reviews:
+            response = analyze_review_sentiments(review_detail['review'])
+            print(response)
+            review_detail['sentiment'] = response['sentiment']
+        return JsonResponse({"status": 200, "reviews": reviews})
+    else: 
+        return JsonResponse({"status": 400, "message":"Bad Request"})
 
 
-@csrf_exempt
-def add_car_model(request):
-    if request.method == 'POST':
-        car_make_id = request.POST.get('car_make_id')
-        name = request.POST.get('name')
-        type = request.POST.get('type')
-        year = request.POST.get('year')
+def get_dealer_details(request, dealer_id):
+    if(dealer_id):
+        endpoint = "/fetchDealer/"+str(dealer_id)
+        dealership = get_request(endpoint)
+        return JsonResponse({"status": 200, "dealer": dealership})
+    else:
+        return JsonResponse({"status": 400, "message": "Bad Request"})
 
+
+def add_review(request):
+    if(request.user.is_anonymous == False):
+        data = json.loads(request.body)
         try:
-            car_make = CarMake.objects.get(id=car_make_id)
-        except ObjectDoesNotExist:
-            return JsonResponse({'error': 'Car make not found'}, status=404)
-
-        car_model = CarModel.objects.create(
-            car_make=car_make, name=name, type=type, year=year
-        )
-        return JsonResponse({'message': f'{car_model.name} added successfully'})
-
-
-@csrf_exempt
-def update_car_model(request, car_model_id):
-    if request.method == 'PUT':
-        try:
-            car_model = CarModel.objects.get(id=car_model_id)
-        except ObjectDoesNotExist:
-            return JsonResponse({'error': 'Car model not found'}, status=404)
-
-        name = request.PUT.get('name')
-        type = request.PUT.get('type')
-        year = request.PUT.get('year')
-
-        car_model.name = name if name else car_model.name
-        car_model.type = type if type else car_model.type
-        car_model.year = year if year else car_model.year
-        car_model.save()
-
-        return JsonResponse({'message': 'Car model updated successfully'})
+            response = post_review(data)
+            return JsonResponse({"status":200})
+        except:
+            return JsonResponse({"status":401,"message":"Error in posting review"})
+    else:
+        return JsonResponse({"status":403,"message":"Unauthorized"})
