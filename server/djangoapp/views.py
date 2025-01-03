@@ -80,14 +80,14 @@ def registration(request):
         return JsonResponse(data)
     else:
         data = {"userName": username, "error": "Already Registered"}
-        return JsonResponse(data)
-        
+        return JsonResponse(data)        
 
 def get_dealerships(request, state="All"):
     if state == "All":
         endpoint = "/fetchDealers"
     else:
         endpoint = "/fetchDealers/"+state
+        
     dealerships = get_request(endpoint)
     print(dealerships)
     return JsonResponse({"status": 200, "dealers": dealerships})
@@ -99,6 +99,7 @@ def get_dealer_reviews(request, dealer_id):
     if dealer_id:
         endpoint = "/fetchReviews/dealer/"+str(dealer_id)
         reviews = get_request(endpoint)
+        
         for review_detail in reviews:
             response = analyze_review_sentiments(review_detail['review'])
             review_detail['sentiment'] = response['sentiment']
@@ -106,13 +107,13 @@ def get_dealer_reviews(request, dealer_id):
     else:
         return JsonResponse({"status": 400, "message": "Bad Request"})
 
+
 # Create a `get_dealer_details` view to render the dealer details
-
-
 def get_dealer_details(request, dealer_id):
     if dealer_id:
         endpoint = "/fetchDealer/"+str(dealer_id)
         dealership = get_request(endpoint)
+        
         return JsonResponse({"status": 200, "dealer": dealership})
     else:
         return JsonResponse({"status": 400, "message": "Bad Request"})
